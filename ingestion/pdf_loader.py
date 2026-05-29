@@ -1,5 +1,8 @@
 # ingestion/pdf_loader.py
 
+import os
+os.environ["ANONYMIZED_TELEMETRY"] = "False"
+
 import fitz  # pymupdf
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from pathlib import Path
