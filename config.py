@@ -6,8 +6,8 @@ load_dotenv()
 
 # --- LLM Settings ---
 OLLAMA_BASE_URL = "http://localhost:11434"
-OLLAMA_MODEL = "phi3:mini"
-OLLAMA_NUM_GPU = 0
+OLLAMA_MODEL = "phi3:mini"        # for RAG answers — better quality
+RAGAS_MODEL = "gemma3:1b"         # for RAGAS evaluation — fast
 
 # --- Embedding Settings ---
 EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"

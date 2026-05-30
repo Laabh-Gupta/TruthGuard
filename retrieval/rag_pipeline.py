@@ -12,6 +12,7 @@ from config import OLLAMA_MODEL, OLLAMA_BASE_URL
 from retrieval.vector_store import VectorStore
 from retrieval.citation_mapper import CitationMapper
 from hallucination_detection.detector import HallucinationDetector
+from evaluation.confidence_scorer import ConfidenceScorer
 
 
 RAG_PROMPT = PromptTemplate(
@@ -40,25 +41,25 @@ class RAGPipeline:
         )
         self.citation_mapper = CitationMapper()
         self.detector = HallucinationDetector()
+        self.confidence_scorer = ConfidenceScorer()
         print(f"✅ RAG Pipeline ready — using {OLLAMA_MODEL}")
 
     def query(self, question: str, top_k: int = 5) -> dict:
         """
         Full TruthGuard pipeline:
-        1. Retrieve relevant chunks
-        2. Generate answer
-        3. Map citations
+        1. Retrieve
+        2. Generate
+        3. Cite
         4. Detect hallucinations
-        5. Return fully analyzed result
+        5. Score confidence
         """
 
         # Step 1 — Retrieve
         retrieved_chunks = self.vector_store.retrieve(question, top_k=top_k)
-
         if not retrieved_chunks:
             return {"error": "No relevant documents found. Upload a PDF first."}
 
-        # Step 2 — Build context + generate
+        # Step 2 — Generate
         context = "\n\n---\n\n".join([
             f"[Source: {c['source']}, Page {c['page']}]\n{c['text']}"
             for c in retrieved_chunks
@@ -66,12 +67,19 @@ class RAGPipeline:
         prompt = RAG_PROMPT.format(context=context, question=question)
         answer = self.llm.invoke(prompt)
 
-        # Step 3 — Citation mapping
+        # Step 3 — Citations
         cited_sentences = self.citation_mapper.map_citations(answer, retrieved_chunks)
         cited_answer = self.citation_mapper.format_cited_answer(cited_sentences)
 
         # Step 4 — Hallucination detection
         hallucination_report = self.detector.analyze(answer, retrieved_chunks)
+
+        # Step 5 — Confidence score
+        retrieval_scores = [c["similarity"] for c in retrieved_chunks]
+        confidence = self.confidence_scorer.score(
+            hallucination_report, retrieval_scores
+        )
+        confidence_report = self.confidence_scorer.format_report(confidence)
 
         return {
             "question": question,
@@ -79,5 +87,7 @@ class RAGPipeline:
             "cited_answer": cited_answer,
             "cited_sentences": cited_sentences,
             "sources": retrieved_chunks,
-            "hallucination_report": hallucination_report
+            "hallucination_report": hallucination_report,
+            "confidence": confidence,
+            "confidence_report": confidence_report
         }
